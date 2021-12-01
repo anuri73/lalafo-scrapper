@@ -1,2 +1,1 @@
-# lalafo-scrapper
-Lalafo scrapper
+lalafo.kg scrapper
