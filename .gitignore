@@ -2,3 +2,4 @@
 target/
 .metals
 .bloop
+/src/main/resources/
