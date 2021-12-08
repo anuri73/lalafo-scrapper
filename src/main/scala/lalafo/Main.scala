@@ -37,59 +37,70 @@ object Main extends Config {
   import io.circe.syntax._
 
   import java.io.File
-  import kantan.csv._ 
+  import kantan.csv._
   import kantan.csv.ops._
   import kantan.csv.generic._
 
+  val csv =
+    new File("src/main/resources/apartments.csv").asCsvWriter[Apartment](rfc)
+
   def main(args: Array[String]): Unit = {
-    val response = basicRequest
-      .get(
-        uri"https://lalafo.kg/api/search/v3/feed/search?category_id=$categryId&expand=url&page=1"
-      )
-      .headers(headers)
-      .send()
+    for (page <- 1 to pageAmount) {
+      val response = basicRequest
+        .get(
+          uri"https://lalafo.kg/api/search/v3/feed/search?category_id=$categryId&expand=url&page=$page"
+        )
+        .headers(headers)
+        .send()
 
-    response.onComplete {
-      case Success(response) => {
-        parse(response.body.getOrElse("[]")) match {
-          case Left(parsingError) =>
-            throw new IllegalArgumentException(
-              s"Invalid JSON object: ${parsingError.message}"
-            )
-          case Right(json) =>
-            val items = json.hcursor
-              .downField("items")
-              .values
-              .getOrElse(Vector.empty[Json])
-
-            val apartments = items.map(row =>
-              new Apartment(
-                row.hcursor.downField("id").as[Int].getOrElse(0),
-                row.hcursor.downField("countryId").as[Int].getOrElse(0),
-                row.hcursor.downField("city").as[String].getOrElse(""),
-                row.hcursor.downField("city_id").as[Int].getOrElse(0),
-                row.hcursor.downField("title").as[String].getOrElse(""),
-                row.hcursor
-                  .downField("description")
-                  .as[String]
-                  .getOrElse("")
-                  .split('\n')
-                  .map(_.trim.filter(_ >= ' '))
-                  .mkString,
-                row.hcursor.downField("url").as[String].getOrElse(""),
-                row.hcursor.downField("lat").as[Double].getOrElse(0.0),
-                row.hcursor.downField("lon").as[Double].getOrElse(0.0),
-                row.hcursor.downField("price").as[Int].getOrElse(0),
-                row.hcursor.downField("currency").as[String].getOrElse("")
+      response.onComplete {
+        case Success(response) => {
+          parse(response.body.getOrElse("[]")) match {
+            case Left(parsingError) =>
+              throw new IllegalArgumentException(
+                s"Invalid JSON object: ${parsingError.message}"
               )
-            )
+            case Right(json) =>
+              val items = json.hcursor
+                .downField("items")
+                .values
+                .getOrElse(Vector.empty[Json])
 
-            new File("src/main/resources/apartments.csv").writeCsv[Apartment](apartments, rfc)
+              val apartments = items.map(row =>
+                new Apartment(
+                  row.hcursor.downField("id").as[Int].getOrElse(0),
+                  row.hcursor.downField("countryId").as[Int].getOrElse(0),
+                  row.hcursor.downField("city").as[String].getOrElse(""),
+                  row.hcursor.downField("city_id").as[Int].getOrElse(0),
+                  row.hcursor.downField("title").as[String].getOrElse(""),
+                  row.hcursor
+                    .downField("description")
+                    .as[String]
+                    .getOrElse("")
+                    .split('\n')
+                    .map(_.trim.filter(_ >= ' '))
+                    .mkString,
+                  row.hcursor.downField("url").as[String].getOrElse(""),
+                  row.hcursor.downField("lat").as[Double].getOrElse(0.0),
+                  row.hcursor.downField("lon").as[Double].getOrElse(0.0),
+                  row.hcursor.downField("price").as[Int].getOrElse(0),
+                  row.hcursor.downField("currency").as[String].getOrElse("")
+                )
+              )
 
-            sttpBackend.close()
+              apartments.map(apartment => {
+                csv.write(apartment)
+              })
+
+              sttpBackend.close()
+          }
         }
+        case Failure(t) =>
+          println("An error has occurred: " + t.getMessage)
+          sttpBackend.close()
       }
-      case Failure(t) => println("An error has occurred: " + t.getMessage)
+
+      csv.close()
     }
   }
 }
@@ -107,4 +118,5 @@ trait Config {
     "Authorization" -> "Bearer",
     "user-hash" -> "9209cdf9-4d5f-46d3-9631-0d2e01b98095"
   )
+  lazy val pageAmount: Int = 10
 }
