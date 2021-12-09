@@ -15,11 +15,24 @@ case class Apartment(
     lat: Double,
     lon: Double,
     price: Int,
-    currency: String,
-    apartmentType: String,
-    bedroomAmount: Int,
-    area: Int
-)
+    currency: String
+) {
+  private lazy val titleItems = title.split(",")
+
+  val apartmentType: String = titleItems(0)
+
+  val bedroomAmount: Int = {
+    ("""\d+""".r findFirstIn titleItems.lift(1).getOrElse(""))
+      .getOrElse("0")
+      .toInt
+  }
+  val area: Int = {
+    ("""\d+""".r findFirstIn titleItems.lift(2).getOrElse(""))
+      .getOrElse("0")
+      .toInt
+  }
+}
+
 object Main extends Config {
 
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -39,6 +52,27 @@ object Main extends Config {
   import kantan.csv.ops._
   import kantan.csv.generic._
 
+  implicit val apartmentEncoder: RowEncoder[Apartment] =
+    RowEncoder.encoder(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)(
+      (a: Apartment) =>
+        (
+          a.id,
+          a.countryId,
+          a.city,
+          a.city_id,
+          a.title,
+          a.description,
+          a.url,
+          a.lat,
+          a.lon,
+          a.price,
+          a.currency,
+          a.area,
+          a.apartmentType,
+          a.bedroomAmount
+        )
+    )
+
   val csv =
     new File("src/main/resources/apartments.csv").asCsvWriter[Apartment](
       rfc.withHeader(
@@ -53,9 +87,9 @@ object Main extends Config {
         "lon",
         "price",
         "currency",
+        "area",
         "apartmentType",
-        "bedroomAmount",
-        "area"
+        "bedroomAmount"
       )
     )
 
@@ -82,26 +116,12 @@ object Main extends Config {
                 .getOrElse(Vector.empty[Json])
 
               val apartments = items.map(row => {
-                val title =
-                  row.hcursor.downField("title").as[String].getOrElse("")
-
-                val titleItems = title.split(",")
-
-                val bedroomAmount: Int = {
-                  val value = titleItems.applyOrElse(1, "").toString()
-                  ("""\d+""".r findFirstIn value).getOrElse("0").toInt
-                }
-                val area: Int = {
-                  val value = titleItems.applyOrElse(2, "").toString()
-                  ("""\d+""".r findFirstIn value).getOrElse("0").toInt
-                }
-
                 new Apartment(
                   row.hcursor.downField("id").as[Int].getOrElse(0),
                   row.hcursor.downField("countryId").as[Int].getOrElse(0),
                   row.hcursor.downField("city").as[String].getOrElse(""),
                   row.hcursor.downField("city_id").as[Int].getOrElse(0),
-                  title,
+                  row.hcursor.downField("title").as[String].getOrElse(""),
                   row.hcursor
                     .downField("description")
                     .as[String]
@@ -113,15 +133,12 @@ object Main extends Config {
                   row.hcursor.downField("lat").as[Double].getOrElse(0.0),
                   row.hcursor.downField("lng").as[Double].getOrElse(0.0),
                   row.hcursor.downField("price").as[Int].getOrElse(0),
-                  row.hcursor.downField("currency").as[String].getOrElse(""),
-                  titleItems(0),
-                  bedroomAmount,
-                  area
+                  row.hcursor.downField("currency").as[String].getOrElse("")
                 )
               })
 
-              apartments.map(apartment => {
-                csv.write(apartment)
+              apartments.map(a => {
+                csv.write(a)
               })
           }
         }
