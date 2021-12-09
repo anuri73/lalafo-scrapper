@@ -16,12 +16,20 @@ case class Apartment(
     lon: Double,
     price: Int,
     currency: String
-)
+) {
+  private lazy val titleItems = title.split(",")
 
-case class LalafoResponse(
-    items: List[Apartment]
-)
+  val apartmentType: String = titleItems(0)
 
+  val bedroomAmount: Int = {
+    val value = titleItems.applyOrElse(1, "").toString()
+    ("""\d+""".r findFirstIn value).getOrElse("0").toInt
+  }
+  val area: Int = {
+    val value = titleItems.applyOrElse(2, "").toString()
+    ("""\d+""".r findFirstIn value).getOrElse("0").toInt
+  }
+}
 object Main extends Config {
 
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -42,7 +50,24 @@ object Main extends Config {
   import kantan.csv.generic._
 
   val csv =
-    new File("src/main/resources/apartments.csv").asCsvWriter[Apartment](rfc)
+    new File("src/main/resources/apartments.csv").asCsvWriter[Apartment](
+      rfc.withHeader(
+        "id",
+        "countryId",
+        "city",
+        "city_id",
+        "title",
+        "description",
+        "url",
+        "lat",
+        "lon",
+        "price",
+        "currency",
+        "apartmentType",
+        "bedroomAmount",
+        "area"
+      )
+    )
 
   def main(args: Array[String]): Unit = {
     for (page <- 1 to pageAmount) {
@@ -82,7 +107,7 @@ object Main extends Config {
                     .mkString,
                   row.hcursor.downField("url").as[String].getOrElse(""),
                   row.hcursor.downField("lat").as[Double].getOrElse(0.0),
-                  row.hcursor.downField("lon").as[Double].getOrElse(0.0),
+                  row.hcursor.downField("lng").as[Double].getOrElse(0.0),
                   row.hcursor.downField("price").as[Int].getOrElse(0),
                   row.hcursor.downField("currency").as[String].getOrElse("")
                 )
@@ -91,16 +116,13 @@ object Main extends Config {
               apartments.map(apartment => {
                 csv.write(apartment)
               })
-
-              sttpBackend.close()
           }
         }
         case Failure(t) =>
           println("An error has occurred: " + t.getMessage)
-          sttpBackend.close()
       }
 
-      csv.close()
+      Thread.sleep(1000)
     }
   }
 }
@@ -118,5 +140,5 @@ trait Config {
     "Authorization" -> "Bearer",
     "user-hash" -> "9209cdf9-4d5f-46d3-9631-0d2e01b98095"
   )
-  lazy val pageAmount: Int = 10
+  lazy val pageAmount: Int = 1
 }
