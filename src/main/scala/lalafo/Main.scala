@@ -15,21 +15,11 @@ case class Apartment(
     lat: Double,
     lon: Double,
     price: Int,
-    currency: String
-) {
-  private lazy val titleItems = title.split(",")
-
-  val apartmentType: String = titleItems(0)
-
-  val bedroomAmount: Int = {
-    val value = titleItems.applyOrElse(1, "").toString()
-    ("""\d+""".r findFirstIn value).getOrElse("0").toInt
-  }
-  val area: Int = {
-    val value = titleItems.applyOrElse(2, "").toString()
-    ("""\d+""".r findFirstIn value).getOrElse("0").toInt
-  }
-}
+    currency: String,
+    apartmentType: String,
+    bedroomAmount: Int,
+    area: Int
+)
 object Main extends Config {
 
   import scala.concurrent.ExecutionContext.Implicits.global
@@ -91,13 +81,27 @@ object Main extends Config {
                 .values
                 .getOrElse(Vector.empty[Json])
 
-              val apartments = items.map(row =>
+              val apartments = items.map(row => {
+                val title =
+                  row.hcursor.downField("title").as[String].getOrElse("")
+
+                val titleItems = title.split(",")
+
+                val bedroomAmount: Int = {
+                  val value = titleItems.applyOrElse(1, "").toString()
+                  ("""\d+""".r findFirstIn value).getOrElse("0").toInt
+                }
+                val area: Int = {
+                  val value = titleItems.applyOrElse(2, "").toString()
+                  ("""\d+""".r findFirstIn value).getOrElse("0").toInt
+                }
+
                 new Apartment(
                   row.hcursor.downField("id").as[Int].getOrElse(0),
                   row.hcursor.downField("countryId").as[Int].getOrElse(0),
                   row.hcursor.downField("city").as[String].getOrElse(""),
                   row.hcursor.downField("city_id").as[Int].getOrElse(0),
-                  row.hcursor.downField("title").as[String].getOrElse(""),
+                  title,
                   row.hcursor
                     .downField("description")
                     .as[String]
@@ -109,9 +113,12 @@ object Main extends Config {
                   row.hcursor.downField("lat").as[Double].getOrElse(0.0),
                   row.hcursor.downField("lng").as[Double].getOrElse(0.0),
                   row.hcursor.downField("price").as[Int].getOrElse(0),
-                  row.hcursor.downField("currency").as[String].getOrElse("")
+                  row.hcursor.downField("currency").as[String].getOrElse(""),
+                  titleItems(0),
+                  bedroomAmount,
+                  area
                 )
-              )
+              })
 
               apartments.map(apartment => {
                 csv.write(apartment)
