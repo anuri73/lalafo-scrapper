@@ -6,6 +6,7 @@ ThisBuild / organizationName := "lalafo"
 val SttpVersion = "2.2.10"
 val CirceVersion = "0.14.1"
 val CSVVersion = "0.6.2"
+val AkkaVersion = "2.6.17"
 
 lazy val root = (project in file("."))
   .settings(
@@ -19,6 +20,7 @@ lazy val root = (project in file("."))
       "io.circe" %% "circe-parser" % CirceVersion,
       "com.nrinaudo" %% "kantan.csv" % CSVVersion,
       "com.nrinaudo" %% "kantan.csv-generic" % CSVVersion,
-      "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime
+      "ch.qos.logback" % "logback-classic" % "1.1.3" % Runtime,
+      "com.typesafe.akka" %% "akka-actor" % AkkaVersion
     )
   )
